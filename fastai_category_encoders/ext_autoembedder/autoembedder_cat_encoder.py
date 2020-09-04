@@ -4,23 +4,25 @@ the AutoEmbedder model from `gensim` to generate unsupervised
 embeddings from categorical features.
 """
 import torch
+import torch.nn.functional as F
 import numpy as np
 import pandas as pd
 
 from typing import Iterable, Type, Union, List, Dict
-from fastai.tabular import (
-    TabularList,
-    TabularDataBunch,
+from fastai.tabular.core import TabDataLoader
+from fastai.tabular.data import (
+    TabularDataLoaders,
     Categorify,
     FillMissing,
     Normalize,
-    DatasetType,
 )
-from fastai.basic_train import Learner
+from fastai.tabular.model import get_emb_sz
+from fastai.learner import Learner
 
 from ..base import CustomCategoryEncoder, CategoryEncoderPreprocessor
 from .autoembedder import AutoEmbedder
 from .loss import EmbeddingLoss
+from .tensor import expanded
 
 
 __all__ = [
@@ -32,32 +34,22 @@ __all__ = [
 class AutoEmbedderPreprocessor(CategoryEncoderPreprocessor):
     """Uses an `AutoEmbedder` model to perform encoding of categorical features."""
 
-    def process(self, df: pd.DataFrame, first: bool = False) -> TabularDataBunch:
+    def process(self, df: pd.DataFrame, first: bool = False) -> TabularDataLoaders:
         if df is None:
             raise RuntimeError("DataFrame is missing")
         # Setup feature names + processes
         procs = [FillMissing, Categorify, Normalize]
         if first:
-            self.data = (
-                TabularList.from_df(
-                    df,
-                    cat_names=self.cat_names,
-                    cont_names=self.cont_names,
-                    procs=procs,
-                )
-                .split_none()
-                .label_empty()
-                .databunch()
+            self.data = TabularDataLoaders.from_df(
+                df,
+                cat_names=self.cat_names,
+                cont_names=self.cont_names,
+                procs=procs,
+                valid_idx=[-1],
             )
             return self.data
         else:
-            self.data.test_dl = None
-            self.data.add_test(
-                TabularList.from_df(
-                    df, cat_names=self.cat_names, cont_names=self.cont_names
-                )
-            )
-            return self.data.test_dl
+            return self.data.test_dl(df)
 
 
 class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
@@ -65,20 +57,17 @@ class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
     learn: Learner = None
     emb_szs: Dict[str, int] = None
 
-    def encode(self, X: Union[TabularDataBunch, torch.utils.data.DataLoader]):
+    def encode(self, X: TabDataLoader):
         """Encodes all elements in `data`."""
-        ds_type = (
-            DatasetType.Train if isinstance(X, TabularDataBunch) else DatasetType.Test
-        )
-        print(f"Encoding {ds_type}")
-        preds = self.learn.get_preds(ds_type=ds_type)[0].cpu().numpy()
+        data = X if isinstance(X, TabDataLoader) else X.train
+        preds = self.learn.get_preds(dl=data, reorder=False)[0].cpu().numpy()
         print(preds.shape)
         return pd.DataFrame(preds, columns=self.get_feature_names())
 
-    def fit(self, X: TabularDataBunch):
+    def fit(self, X: TabularDataLoaders):
         """Creates the learner and trains it."""
-        emb_szs = X.get_emb_szs({})
-        self.emb_szs = {col: sz[1] for col, sz in zip(self.cat_names, emb_szs)}
+        emb_szs = get_emb_sz(X.train_ds, {})
+        self.emb_szs = {col: sz for col, sz in zip(self.cat_names, emb_szs)}
         n_conts = len(X.cont_names)
         n_cats = sum(list(map(lambda e: e[1], emb_szs)))
         in_sz = n_conts + n_cats
@@ -87,29 +76,41 @@ class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
         model = AutoEmbedder(in_sz, out_sz, emb_szs, [2000, 1000])
         self.learn = Learner(X, model, loss_func=EmbeddingLoss(model), wd=1.0)
         # TODO hide training progress?
-        self.learn.fit_one_cycle(1, max_lr=3e-3)
+        with self.learn.no_bar():
+            self.learn.fit_one_cycle(1, max_lr=3e-3)
 
     def decode(self, X: pd.DataFrame) -> pd.DataFrame:
         """Decodes multiple items for one feature embedding."""
-        start_emb = 0
+        column_idx = 0
         df = pd.DataFrame()
-        data = torch.tensor(X.values)
+        data = torch.tensor(X[self.get_feature_names()].values)
         embeddings = self.learn.model.embeddings.embeddings
-        emb_szs = list(map(lambda e: e.embedding_dim, embeddings))
-        cat_szs = list(map(lambda e: e.num_embeddings, embeddings))
-        for emb, emb_sz, n_classes, name in zip(
-            embeddings, emb_szs, cat_szs, self.cat_names
-        ):
-            cat_embeddings = [emb(torch.tensor([c]).cuda()) for c in range(n_classes)]
-            item_feature = data[start_emb : start_emb + emb_sz]
-            most_similar = torch.nn.functional.cosine_similarity(
-                item_feature.unsqueeze(0), torch.cat(cat_embeddings, dim=0)
+        # Split data into chunks depending on embedding sizes
+        data = torch.split(
+            data, list(map(lambda o: o[1], self.emb_szs.values())), dim=-1
+        )
+        # Iterate over features, decoding each one for all rows
+        for (
+            embedding_vectors,
+            embedding_layer,
+            (colname, (n_unique_values, embedding_size)),
+        ) in zip(data, embeddings, self.emb_szs.items()):
+            # Calculate the embedding output for each category value
+            cat_embeddings = embedding_layer(
+                torch.tensor(range(n_unique_values)).cuda()
             )
-            most_similar = most_similar.argmax()
-            print((name, len(most_similar)))
-            df[name] = [most_similar.cpu().numpy()]
-            start_emb += emb_sz
-            # TODO: map back into strings?
+            # Compute cosine similarity over embeddings
+            most_similar = expanded(
+                embedding_vectors,
+                cat_embeddings,
+                lambda a, b: F.cosine_similarity(a, b, dim=-1),
+            )
+            # Map values to their most similar category
+            most_similar = most_similar.argmax(dim=-1)
+            # Save data into decoded column
+            df[colname] = most_similar.cpu().numpy()
+            # move forward the column index
+            column_idx += embedding_size
         return df
 
     def get_feature_names(self) -> List[str]:
@@ -117,5 +118,5 @@ class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
         return [
             f"{column}_{feature_num}"
             for column in self.cat_names
-            for feature_num in range(self.emb_szs[column])
+            for feature_num in range(self.emb_szs[column][1])
         ]

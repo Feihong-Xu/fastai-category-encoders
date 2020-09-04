@@ -58,19 +58,17 @@ class AutoEmbedder(Module):
     def forward(self, x_cat: torch.Tensor, x_cont: torch.Tensor) -> torch.Tensor:
         # Pass each categorical feature into its corresponding embedding module
         if x_cat.size(0) > 0:
-            x_embedded = self.embeddings(x_cat)
+            x = self.embeddings(x_cat)
             # x = self.emb_drop(x)
         # Concatenate embedding outputs and continuous variables
-        if x_cont.size(0) > 0:
-            x = torch.cat([x_embedded, x_cont], -1) if x_cat.size(0) > 0 else x_cont
-        else:
-            x = x_embedded
+        if self.training and x_cont.size(0) > 0:
+            x = torch.cat([x, x_cont], -1) if x_cat.size(0) > 0 else x_cont
+        self.last_target = x.clone().detach()
         # If in evaluation mode, simply return the embedding output
-        if not self.train:
+        if not self.training:
             return x
         # Otherwise, if in training, save the embedding output for loss computation
         # and pass the embedding output to the autoencoder
-        self.last_target = x.clone().detach()
         x = self.autoencoder(x)
         # x = self.out(x)
         return x
