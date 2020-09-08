@@ -1,4 +1,11 @@
 .ipynb_checkpoints
 __pycache__
-data
 ssh-credentials.conf
+data
+models
+.vscode
+build
+dist
+fastai_category_encoders.egg-info
+.env
+.vscode
