@@ -45,7 +45,7 @@ class AutoEmbedderPreprocessor(CategoryEncoderPreprocessor):
                 cat_names=self.cat_names,
                 cont_names=self.cont_names,
                 procs=procs,
-                valid_idx=[-1],
+                valid_idx=[],
             )
             return self.data
         else:
@@ -77,7 +77,7 @@ class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
         self.learn = Learner(X, model, loss_func=EmbeddingLoss(model), wd=1.0)
         # TODO hide training progress?
         with self.learn.no_bar():
-            self.learn.fit_one_cycle(1, max_lr=3e-3)
+            self.learn.fit_one_cycle(20, max_lr=3e-3)
 
     def decode(self, X: pd.DataFrame) -> pd.DataFrame:
         """Decodes multiple items for one feature embedding."""
