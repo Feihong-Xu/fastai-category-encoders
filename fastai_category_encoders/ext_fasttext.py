@@ -139,3 +139,6 @@ class FastTextCategoryEncoder(CustomCategoryEncoder):
             self.cat_names,
         )
         return np.array(list(mapped_names)).flatten().tolist()
+
+    def get_emb_szs(self):
+        return {col: self.emb_sz for col in self.cat_names}

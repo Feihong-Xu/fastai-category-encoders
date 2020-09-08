@@ -49,3 +49,18 @@ class CategoryEncode(TabularProc):
 
     def __to_dataframe(self, to: TabularPandas) -> pd.DataFrame:
         return pd.concat([to.conts, to.cats], axis=1)
+
+    @property
+    def uses_embeddings(self):
+        """Returns `True` if the encoder strategy uses embeddings; False otherwise."""
+        return self.strategy in ["fasttext", "autoembedder"]
+
+    def get_emb_szs(self):
+        """
+        Returns embedding sizes for each feature, or an empty
+        dict if the encoding does not use embeddings.
+        """
+        if self.uses_embeddings:
+            return self.encoder.get_emb_szs()
+        else:
+            return dict()

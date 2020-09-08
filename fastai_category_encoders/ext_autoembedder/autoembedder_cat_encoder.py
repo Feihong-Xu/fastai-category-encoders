@@ -120,3 +120,6 @@ class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
             for column in self.cat_names
             for feature_num in range(self.emb_szs[column][1])
         ]
+
+    def get_emb_szs(self):
+        return self.emb_szs
