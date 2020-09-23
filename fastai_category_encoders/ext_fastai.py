@@ -35,12 +35,15 @@ class CategoryEncode(TabularProc):
         self.encoder.fit_transform(self.__to_dataframe(to))
 
     def encodes(self, to: TabularPandas) -> TabularPandas:
+        """Encodes categorical features in `to`."""
         encoded_cats = self.encoder.transform(self.__to_dataframe(to))
         encoded_features = self.encoder.get_feature_names()
         to[encoded_features] = encoded_cats
         to.cat_names = []
+        to.cont_names = encoded_features + to.cont_names
 
     def decodes(self, to: TabularPandas) -> TabularPandas:
+        """Decodes transformed categorical features in `to`."""
         encoded_features = self.encoder.get_feature_names()
         decoded_cats = self.encoder.inverse_transform(to[encoded_features])
         to[self.encoder.cat_names] = decoded_cats.copy()
