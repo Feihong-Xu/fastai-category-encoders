@@ -2,6 +2,12 @@
 
 ## Get Started
 
+### Install as a Python package
+
+```bash
+pip install git+https://github.com/kireygroup/fastai-category-encoders
+```
+
 ### Prerequisites
 
 To run this project you need to install Docker or Nvidia-Docker.
