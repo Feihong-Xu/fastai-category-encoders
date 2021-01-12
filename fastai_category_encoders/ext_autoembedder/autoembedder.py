@@ -1,12 +1,11 @@
+from typing import List, Tuple
+
 import torch
 import torch.nn as nn
-
-from typing import List, Tuple
 from fastai.layers import Embedding
 from fastai.torch_core import Module
 
 from .autoencoder import SymmetricalAutoEncoder
-
 
 __all__ = [
     "EmbeddingLayer",

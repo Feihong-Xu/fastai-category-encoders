@@ -1,11 +1,10 @@
 import pandas as pd
-
-from fastai.tabular.data import TabularProc, TabularPandas
+from fastai.tabular.data import TabularPandas, TabularProc
 
 from .base import CategoryEncoder
 from .ext_autoembedder import AutoEmbedderCategoryEncoder
-from .ext_fasttext import FastTextCategoryEncoder
 from .ext_category_encoders import LibraryCategoryEncoder
+from .ext_fasttext import FastTextCategoryEncoder
 
 
 class CategoryEncode(TabularProc):
@@ -13,6 +12,7 @@ class CategoryEncode(TabularProc):
     Wraps a `CategoryEncoder` with a Fastai `TabularProc` to perform
     categorical feature encoding seamlessly.
     """
+    order = 100  # to run after Normalize proc, avoiding embedding normalization
 
     def __init__(self, strategy: str, **kwargs):
         self.strategy = strategy
@@ -22,15 +22,11 @@ class CategoryEncode(TabularProc):
     def setups(self, to: TabularPandas) -> None:
         """Saves training set categories and trains the embedding model."""
         if self.strategy == "fasttext":
-            self.encoder = FastTextCategoryEncoder(
-                to.cat_names, to.cont_names, **self._kwargs
-            )
+            self.encoder = FastTextCategoryEncoder(to.cat_names, to.cont_names, **self._kwargs)
         elif self.strategy == "autoembedder":
             self.encoder = AutoEmbedderCategoryEncoder(to.cat_names, to.cont_names)
         else:
-            self.encoder = LibraryCategoryEncoder(
-                to.cat_names, to.cont_names, self.strategy
-            )
+            self.encoder = LibraryCategoryEncoder(to.cat_names, to.cont_names, self.strategy)
         self.to = to
         self.encoder.fit_transform(self.__to_dataframe(to))
 

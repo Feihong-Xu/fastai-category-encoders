@@ -3,27 +3,22 @@ This module implements the base `CustomCategoryEncoder` with
 the AutoEmbedder model from `gensim` to generate unsupervised
 embeddings from categorical features.
 """
-import torch
-import torch.nn.functional as F
+from typing import Dict, Iterable, List, Type, Union
+
 import numpy as np
 import pandas as pd
-
-from typing import Iterable, Type, Union, List, Dict
-from fastai.tabular.core import TabDataLoader
-from fastai.tabular.data import (
-    TabularDataLoaders,
-    Categorify,
-    FillMissing,
-    Normalize,
-)
-from fastai.tabular.model import get_emb_sz
+import torch
+import torch.nn.functional as F
 from fastai.learner import Learner
+from fastai.tabular.core import TabDataLoader
+from fastai.tabular.data import (Categorify, FillMissing, Normalize,
+                                 TabularDataLoaders)
+from fastai.tabular.model import get_emb_sz
 
-from ..base import CustomCategoryEncoder, CategoryEncoderPreprocessor
+from ..base import CategoryEncoderPreprocessor, CustomCategoryEncoder
 from .autoembedder import AutoEmbedder
 from .loss import EmbeddingLoss
 from .tensor import expanded
-
 
 __all__ = [
     "AutoEmbedderPreprocessor",
@@ -61,7 +56,6 @@ class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
         """Encodes all elements in `data`."""
         data = X if isinstance(X, TabDataLoader) else X.train
         preds = self.learn.get_preds(dl=data, reorder=False)[0].cpu().numpy()
-        print(preds.shape)
         return pd.DataFrame(preds, columns=self.get_feature_names())
 
     def fit(self, X: TabularDataLoaders):
@@ -90,21 +84,13 @@ class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
             data, list(map(lambda o: o[1], self.emb_szs.values())), dim=-1
         )
         # Iterate over features, decoding each one for all rows
-        for (
-            embedding_vectors,
-            embedding_layer,
-            (colname, (n_unique_values, embedding_size)),
-        ) in zip(data, embeddings, self.emb_szs.items()):
+        for (embedding_vectors,
+             embedding_layer,
+             (colname, (n_unique_values, embedding_size))) in zip(data, embeddings, self.emb_szs.items()):
             # Calculate the embedding output for each category value
-            cat_embeddings = embedding_layer(
-                torch.tensor(range(n_unique_values)).cuda()
-            )
+            cat_embeddings = embedding_layer(torch.tensor(range(n_unique_values)).to(device=embedding_layer.device))
             # Compute cosine similarity over embeddings
-            most_similar = expanded(
-                embedding_vectors,
-                cat_embeddings,
-                lambda a, b: F.cosine_similarity(a, b, dim=-1),
-            )
+            most_similar = expanded(embedding_vectors, cat_embeddings, lambda a, b: F.cosine_similarity(a, b, dim=-1))
             # Map values to their most similar category
             most_similar = most_similar.argmax(dim=-1)
             # Save data into decoded column
@@ -114,12 +100,13 @@ class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
         return df
 
     def get_feature_names(self) -> List[str]:
-        """TODO document"""
-        return [
-            f"{column}_{feature_num}"
-            for column in self.cat_names
-            for feature_num in range(self.emb_szs[column][1])
-        ]
+        """
+        Returns a list of encoded feature names.
+        For embeddings, this is a list of original categorical names followed by embedding index,
+        e.g. [feature_a_0, feature_a_1, feature_b_0, feature_b_1].
+        """
+        return [f"{column}_{feature_num}" for column in self.cat_names for feature_num in range(self.emb_szs[column][1])]
 
     def get_emb_szs(self):
+        """Returns a dict of embedding sizes for each categorical feature."""
         return self.emb_szs

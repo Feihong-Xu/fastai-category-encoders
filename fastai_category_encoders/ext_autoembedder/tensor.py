@@ -1,5 +1,6 @@
-import torch
 from typing import Callable
+
+import torch
 
 __all__ = [
     "expanded",

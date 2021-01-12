@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 __all__ = ["calc_embedding_size"]
 
 

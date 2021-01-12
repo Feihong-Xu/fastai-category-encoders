@@ -2,12 +2,12 @@
 This module wraps category encoders from the sklearn contrib
 library `category_encoders` into a custom subclass.
 """
-import pandas as pd
-import category_encoders as ce
-
 from typing import List, Optional
-from .base import CategoryEncoder
 
+import category_encoders as ce
+import pandas as pd
+
+from .base import CategoryEncoder
 
 __all__ = [
     "LibraryCategoryEncoder",

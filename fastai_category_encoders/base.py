@@ -1,7 +1,6 @@
-import pandas as pd
-
 from typing import List, Optional, Type
 
+import pandas as pd
 
 __all__ = [
     "CategoryEncoder",
@@ -34,6 +33,7 @@ class CategoryEncoder:
 
     def fit(self, X: pd.DataFrame, y: Optional[pd.DataFrame] = None):
         # we just use fit_transform and drop the output
+        # see https://github.com/scikit-learn-contrib/category_encoders/blob/master/README.md#examples
         self.fit_transform(X, y=y)
 
     def transform(self, X: pd.DataFrame):
@@ -101,9 +101,7 @@ class CustomCategoryEncoder(CategoryEncoder):
 
     def __init__(self, cat_names: List[str], cont_names: List[str], *args, **kwargs):
         super().__init__(cat_names, cont_names)
-        self._preprocessor = self._preprocessor_cls(
-            cat_names, cont_names, *args, **kwargs
-        )
+        self._preprocessor = self._preprocessor_cls(cat_names, cont_names, *args, **kwargs)
 
     def encode(self, X) -> pd.DataFrame:
         """Encodes categoricals in `X` into continuous values."""

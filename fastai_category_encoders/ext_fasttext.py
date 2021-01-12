@@ -3,12 +3,12 @@ This module implements the base `CustomCategoryEncoder` with
 the FastText model from `gensim` to generate unsupervised
 embeddings from categorical features.
 """
+from typing import Dict, Iterable, List, Optional
+
 import numpy as np
 import pandas as pd
 
-from typing import Dict, List, Optional, Iterable
-
-from .base import CustomCategoryEncoder, CategoryEncoderPreprocessor
+from .base import CategoryEncoderPreprocessor, CustomCategoryEncoder
 from .functional import find
 from .utils import calc_embedding_size
 
@@ -52,9 +52,7 @@ class FastTextPreprocessor(CategoryEncoderPreprocessor):
             for i in range(df.values.shape[0])
         ]
 
-    def build_vertical_context(
-        self, df: pd.DataFrame, groupby_cols: List[str]
-    ) -> List[List[str]]:
+    def build_vertical_context(self, df: pd.DataFrame, groupby_cols: List[str]) -> List[List[str]]:
         """
         Builds sentences by joining this processor's columns
         on multiple rows by grouping with `groupby_cols`.
@@ -114,18 +112,9 @@ class FastTextCategoryEncoder(CustomCategoryEncoder):
         cols = []
         for colname, feature_emb in zip(self.cat_names, x_cont):
             # Map each embedding vector into a list of best-matching words
-            topn_words = [
-                map(
-                    lambda o: o[0],
-                    self.model.wv.similar_by_vector(embedding, topn=TOP_N),
-                )
-                for embedding in feature_emb
-            ]
+            topn_words = [map(lambda o: o[0], self.model.wv.similar_by_vector(embedding, topn=TOP_N)) for embedding in feature_emb]
             # Look for words that contain the feature name
-            matches = map(
-                lambda words: str(find(lambda w: w.split("__")[0] == colname, words)),
-                topn_words,
-            )
+            matches = map(lambda words: str(find(lambda w: w.split("__")[0] == colname, words)), topn_words)
             # Remove column name from words
             matches = map(lambda w: w.split("__")[1], matches)
             # Add found words in columns
@@ -133,12 +122,14 @@ class FastTextCategoryEncoder(CustomCategoryEncoder):
         return pd.DataFrame(np.array(cols).transpose(), columns=self.cat_names)
 
     def get_feature_names(self) -> List[str]:
-        """TODO"""
-        mapped_names = map(
-            lambda col: [f"{col}_{count}" for count in range(self.emb_sz)],
-            self.cat_names,
-        )
+        """
+        Returns a list of encoded feature names.
+        For embeddings, this is a list of original categorical names followed by embedding index,
+        e.g. [feature_a_0, feature_a_1, feature_b_0, feature_b_1].
+        """
+        mapped_names = map(lambda col: [f"{col}_{count}" for count in range(self.emb_sz)], self.cat_names)
         return np.array(list(mapped_names)).flatten().tolist()
 
     def get_emb_szs(self):
+        """Returns a dictionary of embedding sizes for each categorical feature."""
         return {col: self.emb_sz for col in self.cat_names}

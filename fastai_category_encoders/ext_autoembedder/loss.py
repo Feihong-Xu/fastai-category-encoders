@@ -3,8 +3,8 @@ Loss functions that work with the EmbeddingModel.
 """
 
 from typing import Callable
-from fastai.metrics import mse
 
+from fastai.metrics import mse
 
 __all__ = [
     "EmbeddingLoss",

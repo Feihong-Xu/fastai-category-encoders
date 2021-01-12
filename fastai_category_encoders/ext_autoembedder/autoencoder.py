@@ -1,8 +1,8 @@
+from typing import Callable, List, Optional
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-
-from typing import Callable, List, Optional
 
 from ..functional import consecutive_pairs
 
