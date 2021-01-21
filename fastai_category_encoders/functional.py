@@ -40,7 +40,7 @@ def find(
         Optional[T]: the first element in `iterable` that matches `func`, or None if missing.
     """
     it = reversed(iterable) if last else iterable
-    for item in iterable:
+    for item in it:
         if func(item):
             return item
     return None
