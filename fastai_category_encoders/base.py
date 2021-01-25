@@ -58,16 +58,12 @@ class CategoryEncoderPreprocessor:
     require some form of data loading.)
     """
 
-    def __init__(self, cat_names: List[str], cont_names: List[str]):
+    def __init__(self, cat_names: List[str], cont_names: List[str], **kwargs):
         self.cat_names = cat_names
         self.cont_names = cont_names
+        self.stored_kwargs = kwargs
 
-    def process(
-        self,
-        df: pd.DataFrame,
-        target: Optional[pd.DataFrame] = None,
-        first: bool = False,
-    ) -> any:
+    def process(self, df: pd.DataFrame, target: Optional[pd.DataFrame] = None, first: bool = False) -> any:
         """
         Processes `df` (and optionally `target`) into
         a data form usable by the category encoder.
@@ -128,9 +124,7 @@ class CustomCategoryEncoder(CategoryEncoder):
         """Performs the inverse transform from continuous to categorical."""
         return self.decode(X)
 
-    def fit_transform(
-        self, X: pd.DataFrame, y: Optional[pd.DataFrame] = None
-    ) -> pd.DataFrame:
+    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """Trains the model and encodes categoricals right away."""
         self.before_fit(X)
         X = self._preprocessor.process(X, first=True)

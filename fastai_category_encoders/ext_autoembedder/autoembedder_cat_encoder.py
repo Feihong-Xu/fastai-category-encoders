@@ -3,9 +3,8 @@ This module implements the base `CustomCategoryEncoder` with
 the AutoEmbedder model from `gensim` to generate unsupervised
 embeddings from categorical features.
 """
-from typing import Dict, Iterable, List, Type, Union
+from typing import Dict, List, Type
 
-import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
@@ -27,27 +26,25 @@ __all__ = [
 
 
 class AutoEmbedderPreprocessor(CategoryEncoderPreprocessor):
-    """Uses an `AutoEmbedder` model to perform encoding of categorical features."""
-
+    """Data preprocessor for `AutoEmbedderCategoryEncoder`."""
     def process(self, df: pd.DataFrame, first: bool = False) -> TabularDataLoaders:
         if df is None:
             raise RuntimeError("DataFrame is missing")
         # Setup feature names + processes
-        procs = [FillMissing, Categorify, Normalize]
+        procs = [Categorify]
+        if self.stored_kwargs.get('fill_missing', default=True):
+            procs.append(FillMissing)
+        if self.stored_kwargs.get('normalize', default=True):
+            procs.append(Normalize)
         if first:
-            self.data = TabularDataLoaders.from_df(
-                df,
-                cat_names=self.cat_names,
-                cont_names=self.cont_names,
-                procs=procs,
-                valid_idx=[],
-            )
+            self.data = TabularDataLoaders.from_df(df, cat_names=self.cat_names, cont_names=self.cont_names, procs=procs, valid_idx=[])
             return self.data
         else:
             return self.data.test_dl(df)
 
 
 class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
+    """Uses an `AutoEmbedder` model to perform encoding of categorical features."""
     _preprocessor_cls: Type[CategoryEncoderPreprocessor] = AutoEmbedderPreprocessor
     learn: Learner = None
     emb_szs: Dict[str, int] = None
@@ -80,13 +77,9 @@ class AutoEmbedderCategoryEncoder(CustomCategoryEncoder):
         data = torch.tensor(X[self.get_feature_names()].values)
         embeddings = self.learn.model.embeddings.embeddings
         # Split data into chunks depending on embedding sizes
-        data = torch.split(
-            data, list(map(lambda o: o[1], self.emb_szs.values())), dim=-1
-        )
+        data = torch.split(data, list(map(lambda o: o[1], self.emb_szs.values())), dim=-1)
         # Iterate over features, decoding each one for all rows
-        for (embedding_vectors,
-             embedding_layer,
-             (colname, (n_unique_values, embedding_size))) in zip(data, embeddings, self.emb_szs.items()):
+        for (embedding_vectors, embedding_layer, (colname, (n_unique_values, embedding_size))) in zip(data, embeddings, self.emb_szs.items()):
             # Calculate the embedding output for each category value
             cat_embeddings = embedding_layer(torch.tensor(range(n_unique_values)).to(device=embedding_layer.device))
             # Compute cosine similarity over embeddings

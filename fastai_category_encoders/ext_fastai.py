@@ -11,6 +11,8 @@ class CategoryEncode(TabularProc):
     """
     Wraps a `CategoryEncoder` with a Fastai `TabularProc` to perform
     categorical feature encoding seamlessly.
+
+    Keyword arguments are forwarded to the encoder preprocessor.
     """
     order = 100  # to run after Normalize proc, avoiding embedding normalization
 
@@ -24,7 +26,7 @@ class CategoryEncode(TabularProc):
         if self.strategy == "fasttext":
             self.encoder = FastTextCategoryEncoder(to.cat_names, to.cont_names, **self._kwargs)
         elif self.strategy == "autoembedder":
-            self.encoder = AutoEmbedderCategoryEncoder(to.cat_names, to.cont_names)
+            self.encoder = AutoEmbedderCategoryEncoder(to.cat_names, to.cont_names, **self._kwargs)
         else:
             self.encoder = LibraryCategoryEncoder(to.cat_names, to.cont_names, self.strategy)
         self.to = to
@@ -37,6 +39,7 @@ class CategoryEncode(TabularProc):
         to[encoded_features] = encoded_cats
         to.cat_names = []
         to.cont_names = encoded_features + to.cont_names
+        return to
 
     def decodes(self, to: TabularPandas) -> TabularPandas:
         """Decodes transformed categorical features in `to`."""
