@@ -34,9 +34,13 @@ class CategoryEncode(TabularProc):
 
     def encodes(self, to: TabularPandas) -> TabularPandas:
         """Encodes categorical features in `to`."""
+        orig_index = to.conts.index
         encoded_cats = self.encoder.transform(self.__to_dataframe(to))
         encoded_features = self.encoder.get_feature_names()
-        to[encoded_features] = encoded_cats
+        # FIX: Manually set the index of the encoded DataFrame,
+        # as Fastai sometimes reorders indices during preprocessing
+        # and this can lead to concatenation errors
+        to[encoded_features] = encoded_cats.set_index(orig_index)
         to.cat_names = []
         to.cont_names = encoded_features + to.cont_names
         return to
