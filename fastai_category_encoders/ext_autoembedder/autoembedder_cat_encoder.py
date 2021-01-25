@@ -32,9 +32,9 @@ class AutoEmbedderPreprocessor(CategoryEncoderPreprocessor):
             raise RuntimeError("DataFrame is missing")
         # Setup feature names + processes
         procs = [Categorify]
-        if self.stored_kwargs.get('fill_missing', default=True):
+        if self.stored_kwargs.get('fill_missing', True):
             procs.append(FillMissing)
-        if self.stored_kwargs.get('normalize', default=True):
+        if self.stored_kwargs.get('normalize', True):
             procs.append(Normalize)
         if first:
             self.data = TabularDataLoaders.from_df(df, cat_names=self.cat_names, cont_names=self.cont_names, procs=procs, valid_idx=[])
