@@ -7,7 +7,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="fastai_category_encoders",
-    version="0.0.3",
+    version="0.0.4",
     url="https://github.com/kireygroup/fastai-category-encoders",
     license="MIT",
     author="Riccardo Sayn",
